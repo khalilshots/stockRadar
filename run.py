@@ -2,17 +2,12 @@ from tools.yfinance_tools import get_stock_info
 from agents.team1.price_filter import run_price_filter
 import logging
 from utils.gates import check_gate
+from strategies.strategy_manager import get_strategy
 # This line makes logging messages actually show up in your terminal
 logging.basicConfig(level=logging.WARNING)
 
-
-
-
-criteria = {
-    "price_min": 2,
-    "price_max": 300,
-    "max_float": 20000000000
-} 
+strategy = get_strategy("Small Cap Momentum")
+criteria = strategy["criteria"]
 
 tickers = ["AAPL", "HOOD"]
 
