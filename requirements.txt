@@ -1,0 +1,4 @@
+certifi==2026.4.22
+cloudinary==1.44.2
+six==1.17.0
+urllib3==2.7.0

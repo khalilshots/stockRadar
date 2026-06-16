@@ -1,0 +1,6 @@
+.env
+data/*.json
+strategies/*.json
+__pycache__/
+*.pyc
+.venv/
