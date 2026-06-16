@@ -1,0 +1,18 @@
+{
+    "strategies": [
+        {
+            "id": "1",
+            "name": "Small Cap Momentum",
+            "criteria": {
+                "price_min": 2,
+                "price_max": 20,
+                "max_float": 10000000,
+                "min_volume": 50000,
+                "min_gap_percent": 10,
+                "max_prior_day_gain": 40
+            },
+            "setup_preferences": ["momentum", "breakout"],
+            "risk_per_trade": 500
+        }
+    ]
+}
