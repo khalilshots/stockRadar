@@ -84,8 +84,8 @@ def test_scan_with_the_llm_on(monkeypatch):
         system = kw["messages"][0]["content"]
         if "news headlines" in system:
             text = '{"has_catalyst": true, "catalyst_type": "contract", "sentiment": "positive", "strength": 80, "headline": "Breakout Co wins $40M Navy contract", "reason": "new Navy contract"}'
-        elif "trade notes" in system:
-            text = '{"summary": "Broke out of a two month range on a Navy contract. Fails if it loses $4.97."}'
+        elif "scan notes" in system:
+            text = '{"why": "Broke out of a two month range on a Navy contract"}'
         else:
             text = '{"present": true, "score": 77, "reason": "clean setup"}'
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=text))])
@@ -99,6 +99,7 @@ def test_scan_with_the_llm_on(monkeypatch):
     assert final["catalyst"]["source"] == "llm"
     assert final["setup_score"] == 77
     assert final["summary"].startswith("Broke out")
+    assert final["summary"].endswith(f"Invalid below ${final['plan']['stop']}.")
 
 
 def test_a_crash_marks_the_scan_failed():

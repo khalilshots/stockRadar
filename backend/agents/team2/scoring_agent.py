@@ -6,14 +6,15 @@ from utils import llm
 AGENT = "scoring_agent"
 WEIGHTS = {"setup": 0.5, "catalyst": 0.2, "volume": 0.15, "sentiment": 0.15}
 
-SYSTEM = """You write one-line trade notes for a momentum trader.
-Given the facts, write two short sentences: why this stock is on the list and what would invalidate it.
-Use the numbers given. No hype, no advice language.
-Reply with only this JSON: {"summary": "..."}"""
+SYSTEM = """You write scan notes for a trader. In one sentence, say why this stock showed up today.
+Use only the facts given and name one or two of the numbers (today's move, relative volume, RSI,
+distance from the 20-day high, the news headline).
+Don't predict prices, don't mention scores or probabilities, don't give advice, don't mention stops.
+Reply with only this JSON: {"why": "..."}"""
 
 
 class Note(BaseModel):
-    summary: str
+    why: str
 
 
 def score(setup: dict, catalyst: dict, snap: dict, sentiment: dict | None) -> tuple[int, dict]:
@@ -33,21 +34,26 @@ def run(snap: dict, setup: dict, catalyst: dict, risk: dict, sentiment: dict | N
     total, parts = score(setup, catalyst, snap, sentiment)
     plan = risk["data"]
 
-    facts = (
-        f"{ticker}: {setup['data']['setup']} setup scored {parts['setup']} ({setup['reason']}). "
-        f"Catalyst: {catalyst['reason']}. Relative volume {snap.get('relative_volume')}x, up {snap.get('change_percent')}% today. "
-        f"Plan: entry ${plan['entry']}, stop ${plan['stop']}, target ${plan['target_1']}."
-    )
+    headline = catalyst["data"].get("headline")
+    facts = "\n".join(f"{k}: {v}" for k, v in {
+        "ticker": ticker,
+        "setup": setup["data"]["setup"],
+        "setup checks passed": ", ".join(k for k, ok in setup["data"].get("checks", {}).items() if ok),
+        "change today %": snap.get("change_percent"),
+        "relative volume": f"{snap.get('relative_volume')}x",
+        "RSI 14": snap.get("rsi_14"),
+        "% from 20-day high": snap.get("pct_from_high_20"),
+        "red days before today": snap.get("down_streak"),
+        "news": headline,
+    }.items() if v not in (None, ""))
+
+    # the model writes the "why", the invalidation level comes from the risk agent so it can't be wrong
     note = llm.ask(SYSTEM, facts, Note) if write_note else None
-    if note and note.summary.strip():
-        summary, source = note.summary.strip(), "llm"
+    if note and note.why.strip():
+        why, source = note.why.strip().rstrip(".") + ".", "llm"
     else:
-        headline = catalyst["data"].get("headline")
         news = f'news: "{headline}"' if headline else "no catalyst checked"
-        summary = (
-            f"{setup['data']['setup'].capitalize()} setup on {snap.get('relative_volume')}x volume, {news}. "
-            f"Invalid below ${plan['stop']}."
-        )
-        source = "rules"
+        why, source = f"{setup['data']['setup'].capitalize()} setup on {snap.get('relative_volume')}x volume, {news}.", "rules"
+    summary = f"{why} Invalid below ${plan['stop']}."
 
     return result(ticker, AGENT, True, f"score {total}", source, score=total, breakdown=parts, summary=summary)
