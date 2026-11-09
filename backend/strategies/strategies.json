@@ -32,7 +32,7 @@
       },
       "setup_preferences": ["reversal"],
       "risk_per_trade": 300,
-      "universe": ["day_losers", "most_actives"]
+      "universe": ["day_gainers", "most_actives"]
     }
   ]
 }

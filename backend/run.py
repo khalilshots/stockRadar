@@ -7,10 +7,41 @@ Run a scan from the terminal.
 """
 import argparse
 import logging
+import re
 
 from config.settings import settings
 from scan_runner import runner
 from strategies.strategy_manager import get_strategy, load_all
+
+
+DROP_REASONS = [
+    (r"^price \$", "price outside the strategy's range"),
+    (r"^gap ", "gap under the minimum"),
+    (r"^already ran", "ran too far yesterday"),
+    (r"^float .* over", "float too large"),
+    (r"^float not available", "no float data"),
+    (r"^volume .* under", "volume too low"),
+    (r"^relative volume", "relative volume too low"),
+    (r"^no news", "no news"),
+    (r"^negative catalyst", "negative news (offering, lawsuit...)"),
+    (r"^no real catalyst", "news doesn't explain the move"),
+    (r"^news unavailable", "news api failed"),
+    (r"^no .* setup", "no matching setup"),
+    (r"too volatile", "stop too wide to size"),
+    (r"^outside the top", "watchlist full"),
+    (r"^score", "ranked below the final list"),
+    (r"^no price history", "no price data from Yahoo"),
+]
+
+
+def summarize_drops(dropped: list[dict]) -> list[tuple[str, int]]:
+    """Group drop reasons by rule so 'gap 0.1%' and 'gap 2.2%' count as one reason."""
+    counts: dict[str, int] = {}
+    for d in dropped:
+        label = next((text for pattern, text in DROP_REASONS if re.search(pattern, d["reason"])), d["reason"])
+        key = f"{d['agent']}: {label}"
+        counts[key] = counts.get(key, 0) + 1
+    return sorted(counts.items(), key=lambda x: -x[1])
 
 
 def main():
@@ -42,14 +73,9 @@ def main():
               f"stop ${p['stop']:<7} target ${p['target_1']:<7} {p['shares']} sh")
         print(f"    {cand['summary']}")
 
-    if not scan["final"]:
-        print("nothing made the final list. top reasons tickers were dropped:")
-        reasons: dict[str, int] = {}
-        for d in scan["dropped"]:
-            key = f"{d['agent']}: {d['reason'].split(' is ')[0].split(',')[0]}"
-            reasons[key] = reasons.get(key, 0) + 1
-        for reason, count in sorted(reasons.items(), key=lambda x: -x[1])[:8]:
-            print(f"  {count:>4}  {reason}")
+    print("\nwhy tickers were dropped:")
+    for reason, count in summarize_drops(scan["dropped"])[:10]:
+        print(f"  {count:>4}  {reason}")
 
     print(f"\nfull results: data/scans/{scan['id']}.json")
 
