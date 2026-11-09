@@ -37,7 +37,7 @@ def grade(snap: dict, setup: str, description: str, checks: dict[str, bool], cor
     failed_core = [name for name in core if not checks.get(name)]
 
     if failed_core:
-        reason = f"no {setup}: " + ", ".join(failed_core) + " not met"
+        reason = f"No {setup}: " + ", ".join(failed_core) + " not met"
         return result(ticker, agent, False, reason, setup=setup, score=rule_score, checks=checks)
 
     facts = "\n".join(f"{k}: {snap.get(k)}" for k in FACT_KEYS if snap.get(k) is not None)
@@ -45,7 +45,7 @@ def grade(snap: dict, setup: str, description: str, checks: dict[str, bool], cor
     verdict = llm.ask(SYSTEM.format(setup=setup, description=description), user, SetupVerdict)
 
     if verdict is None:
-        reason = f"{setup} setup, {len(met)}/{len(checks)} checks: " + ", ".join(met)
+        reason = f"{setup.capitalize()} setup, {len(met)}/{len(checks)} checks: " + ", ".join(met)
         return result(ticker, agent, True, reason, "rules", setup=setup, score=rule_score, checks=checks)
 
     return result(ticker, agent, verdict.present, verdict.reason or f"{setup} graded {verdict.score}", "llm",

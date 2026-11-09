@@ -99,6 +99,6 @@ def _rules(articles: list[dict]) -> CatalystVerdict:
         for kind, pattern in POSITIVE.items():
             if re.search(pattern, text):
                 return CatalystVerdict(has_catalyst=True, catalyst_type=kind, sentiment="positive", strength=60,
-                                       headline=article["headline"], reason=f"{kind} news: {article['headline']}")
+                                       headline=article["headline"], reason=f"{kind.upper() if len(kind) <= 3 else kind.capitalize()} news: {article['headline']}")
     return CatalystVerdict(has_catalyst=False, catalyst_type="none", sentiment="neutral", strength=20,
                            headline=articles[0]["headline"], reason="headlines don't explain the move")

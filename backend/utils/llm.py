@@ -50,6 +50,7 @@ def ask(system: str, user: str, schema: type[BaseModel]) -> BaseModel | None:
 
     # skip params a provider doesn't support instead of erroring
     litellm.drop_params = True
+    litellm.suppress_debug_info = True
 
     try:
         response = litellm.completion(
