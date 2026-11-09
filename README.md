@@ -1,131 +1,162 @@
 # Stock Radar
 
-A stock scanner built around small LLM agents. Each agent answers one narrow question about a ticker ("is the price and float in range?", "is there a real catalyst?"), returns a small JSON verdict, and a gate decides whether the ticker moves on to the next agent or gets dropped.
+A multi-agent stock screener. Two teams of small agents work through a list of tickers: the Discovery team filters on price, float, volume and news catalysts, and the Analysis team looks for momentum, breakout and reversal setups, builds a trade plan and ranks what's left. A FastAPI backend runs the scans and a React dashboard shows the results, including why every dropped ticker was dropped.
 
-The goal is to go from a broad universe of tickers to a short, ranked list of setups worth watching, using the criteria of a strategy you define.
+![Dashboard with sample data](docs/dashboard.png)
 
-> Status: early. The first agent (price filter) works end to end. Most other agents, data tools and the scheduler are stubbed out, and the frontend is still the Vite starter.
+*Screenshot uses made-up tickers.*
 
-## How it's meant to work
+## How a scan works
 
 ```
-universe (≤500)  ──►  Team 1: screening  ──►  watchlist (≤50)  ──►  Team 2: setups + risk  ──►  final list (≤10)
-                      price · volume ·                              momentum · breakout ·
-                      catalyst                                      reversal · risk · scoring
+universe (up to 500)
+  -> Discovery team:  price & float -> volume -> catalyst        -> watchlist (up to 50)
+  -> Analysis team:   momentum, breakout, reversal -> risk        -> candidates
+  -> scoring                                                      -> picks (up to 10)
 ```
 
-- Strategies live in `strategies.json`. Each one sets price range, max float, min volume, min gap %, max prior-day gain, preferred setups and risk per trade.
-- Agents get the stock data plus the strategy criteria and reply with `{ticker, passed, reason}`.
-- Gates (`utils/gates.py`) run after every agent and drop a ticker on a fail, an error, or missing data.
-- LLM calls go through LiteLLM, defaulting to a local Llama 3.2 on Ollama at temperature 0. Swapping to a hosted model is a one-line change.
-- Scans are planned for three windows (Eastern): night (10 PM to midnight), premarket (9:00 to 9:20 AM) and post-market (4 to 6 PM).
-- Results and outcomes get logged to Notion.
+1. Universe. Tickers come from Yahoo's predefined screens (day gainers, small cap gainers, most active), or from a list you pass in.
+2. Market data. One batched yfinance download gets six months of daily bars. Indicators are computed in code: RSI, ATR, 20/50-day averages, 20-day high and low, gap, relative volume.
+3. Discovery team. Each agent returns `{ticker, agent, passed, reason, source, data}`. A gate runs after every agent and drops the ticker on a fail, an error or missing data. Agents run cheapest first, so the float lookup (a network call) only happens for tickers that already passed the price checks, and the catalyst agent (news API plus LLM) only sees tickers that are actually trading.
+4. Analysis team. The three setup agents look at every watchlist ticker. A setup gate keeps the ticker if it shows a setup the strategy wants. The risk agent then sizes the trade: stop at 1.5 ATR below entry, position sized so a stop-out loses exactly the strategy's dollar risk, targets at 2R and 3R, size halved when the VIX is elevated.
+5. Scoring. A weighted score (setup 50%, catalyst 20%, relative volume 15%, news sentiment 15%) ranks the candidates. Alpha Vantage sentiment is only fetched for the top few, since the free tier allows 25 calls a day. The LLM writes a short note for each final pick.
 
-## What's built
+Every agent result is saved in the scan, so you can see each agent's call on any ticker in the dashboard.
 
-| Piece | State |
-|---|---|
-| Price filter agent | Working |
-| yfinance data tool | Working |
-| Gates | Working |
-| Strategy manager | Working |
-| Settings (`config/settings.py`) | Done, not wired in yet |
-| FastAPI backend | Root and `/health` endpoints |
-| Volume, catalyst, momentum, breakout, reversal, risk, scoring agents | Stubs |
-| Finnhub, Alpha Vantage, FRED, NewsAPI, Reddit tools | Stubs |
-| Rate limiter, cache, scheduler, Notion journal | Stubs |
-| React frontend | Vite + Tailwind + shadcn scaffold |
+## Where the LLM fits
+
+LLM calls go through the LiteLLM SDK directly, not an agent framework. The default is a local Llama 3.2 3B on Ollama at temperature 0, and any LiteLLM model string works.
+
+- Plain comparisons stay in code. Price, float and volume checks and the risk math are deterministic. A model has no business deciding whether 6.40 is between 2 and 20.
+- The LLM does the judgment calls. It reads headlines to decide whether there's a real catalyst or a dilutive offering, grades how clean a setup is, and writes the trade note.
+- The model can't contradict the numbers. A setup agent only asks the model to grade a breakout after the rules confirm price is above the 20-day high. The model can veto a setup or score it, but it can't invent one.
+- Replies are validated. Every reply is parsed and checked against a Pydantic schema. If the model is down, slow or returns junk, the agent falls back to its rule-based answer and the result is tagged `rules` instead of `llm`. After one connection failure, the rest of the scan skips the model instead of waiting on a timeout per ticker.
+
+## Data sources
+
+| Source | Used for | Key needed |
+|---|---|---|
+| yfinance | universe screens, daily bars, float and company info | no |
+| Finnhub | company news for the catalyst agent (60 calls/min) | yes |
+| NewsAPI | backup news source (100 calls/day) | yes |
+| Alpha Vantage | news sentiment for the top candidates (25 calls/day) | yes |
+| FRED | VIX level for the market regime | yes |
+
+Every key is optional. Without news keys the catalyst check is skipped, and without FRED the risk agent assumes a normal market. Responses are cached on disk and daily budgets are tracked in `backend/data/usage.json`.
+
+## Setup
+
+Needs Python 3.10+, Node 20+ and [Ollama](https://ollama.com) if you want the LLM.
+
+```bash
+git clone https://github.com/khalilshots/stockRadar.git
+cd stockRadar/backend
+
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env        # add whichever keys you have
+
+ollama pull llama3.2:3b     # optional, set LLM_MODEL=none to run on rules only
+```
+
+## Running it
+
+### From the terminal
+
+```bash
+cd backend
+python run.py                                   # default strategy, Yahoo screens
+python run.py --strategy "Oversold Bounce"
+python run.py --tickers SOFI HOOD PLTR -v       # your own list, with logs
+```
+
+### API
+
+```bash
+cd backend
+uvicorn main:app --reload                       # http://localhost:8000/docs
+```
+
+Set `SCHEDULER_ENABLED=true` in `.env` to run the default strategy on weekdays at 9:00, 16:30 and 22:00 Eastern.
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/status` | model, connected sources, remaining daily budgets, next scheduled scans |
+| GET / PUT / DELETE | `/api/strategies` | list, add or update, remove strategies |
+| POST | `/api/scans` | start a scan, `{"strategy": "...", "tickers": [...]}` |
+| GET | `/api/scans`, `/api/scans/latest`, `/api/scans/{id}` | results, including every drop and its reason |
+| GET | `/api/scans/{id}/tickers/{ticker}` | every agent's call on one ticker |
+
+### Dashboard
+
+```bash
+cd frontend
+npm install
+npm run dev                                     # http://localhost:5173
+```
+
+The dev server proxies `/api` to the backend on port 8000.
+
+### Tests
+
+```bash
+cd backend
+pytest
+```
+
+The tests use fake market data and a fake model, so they run offline with no keys.
+
+## Strategies
+
+Strategies live in `backend/strategies/strategies.json`. Two come with the repo: Small Cap Momentum and Oversold Bounce.
+
+```json
+{
+  "id": "1",
+  "name": "Small Cap Momentum",
+  "criteria": {
+    "price_min": 2,
+    "price_max": 20,
+    "max_float": 10000000,
+    "min_volume": 50000,
+    "min_relative_volume": 1.5,
+    "min_gap_percent": 10,
+    "max_prior_day_gain": 40,
+    "require_catalyst": true
+  },
+  "setup_preferences": ["momentum", "breakout"],
+  "risk_per_trade": 500,
+  "universe": ["small_cap_gainers", "day_gainers", "most_actives"]
+}
+```
 
 ## Project layout
 
 ```
 backend/
-  main.py              FastAPI app
+  main.py                 FastAPI app
+  run.py                  terminal scans
+  scan_runner.py          runs one scan at a time in the background
+  scheduler.py            weekday scans
   agents/
-    team1/             screening agents (price, volume, catalyst)
-    team2/             setup, risk and scoring agents
-    orchestrator.py
-  tools/               one module per data source
-  strategies/          strategies.json + strategy_manager.py
-  utils/               gates, cache, rate limiter
-  config/settings.py   env-driven settings
-  notion/              journal agent
-  scheduler.py
-frontend/              React (Vite, Tailwind, shadcn/ui)
+    orchestrator.py       the pipeline
+    team1/                price_filter, volume_agent, catalyst_agent
+    team2/                momentum, breakout, reversal, risk, scoring
+  tools/                  one module per data source
+  utils/                  gates, indicators, llm, cache, rate limiter, scan store
+  strategies/             strategies.json and the strategy model
+  config/settings.py      settings from .env
+  tests/
+frontend/
+  src/components/         funnel, tables, ticker detail
+  src/components/ui/      shadcn/ui components
 ```
 
-The top-level copies of `agents/`, `tools/`, `utils/` and friends are left over from moving everything into `backend/`. `run.py` at the root is a quick manual test of the price filter.
+## Limits
 
-## Setup
-
-Needs Python 3.10+, Node 20+ and [Ollama](https://ollama.com).
-
-```bash
-git clone https://github.com/khalilshots/stockRadar.git
-cd stockRadar
-
-python -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
-
-ollama pull llama3.2:3b
-
-cp .env.example .env   # add your API keys
-```
-
-Keys go in `.env`: Alpha Vantage, Finnhub, FRED, NewsAPI and a Reddit app (client ID, secret, user agent). All have free tiers.
-
-## Running it
-
-**Price filter test**
-
-```bash
-cp backend/strategies/strategies.json strategies/
-python run.py
-```
-
-Runs AAPL and HOOD through the "Small Cap Momentum" strategy and prints whether each one passes the price and float check.
-
-**API**
-
-```bash
-cd backend
-uvicorn main:app --reload
-```
-
-Serves on `http://localhost:8000`. CORS is open to the frontend on port 5173.
-
-**Frontend**
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Adding a strategy
-
-```python
-from strategies.strategy_manager import save_strategy
-
-save_strategy({
-    "id": "2",
-    "name": "Low Float Gappers",
-    "criteria": {
-        "price_min": 1,
-        "price_max": 10,
-        "max_float": 5000000,
-        "min_volume": 100000,
-        "min_gap_percent": 20,
-        "max_prior_day_gain": 30
-    },
-    "setup_preferences": ["breakout"],
-    "risk_per_trade": 250
-})
-```
-
-Saving with an existing name overwrites that strategy.
-
-## Disclaimer
+- Daily bars only. During market hours the last bar is today so far, so relative volume is low early in the session.
+- Yahoo data is unofficial and can be throttled. Fundamentals are cached for 12 hours.
+- A 3B model is fast on a laptop but not a strong analyst. That's why it grades and explains, and the rules decide.
 
 This is a personal research project, not financial advice.
