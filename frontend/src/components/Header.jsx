@@ -1,8 +1,9 @@
 import { useState } from "react"
-import { LoaderCircle } from "lucide-react"
+import { CodeXml, LoaderCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input, NativeSelect } from "@/components/ui/input"
+import { DEMO, REPO_URL } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const SOURCE_NAMES = {
@@ -52,6 +53,15 @@ export function Header({ status, strategies, strategy, onStrategy, onRun, runnin
           </div>
         </div>
 
+        {DEMO ? (
+          <a
+            href={REPO_URL}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none hover:bg-primary/85 focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <CodeXml className="size-4" />
+            View code
+          </a>
+        ) : (
         <form onSubmit={submit} className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <label className="sr-only" htmlFor="strategy">Strategy</label>
           <NativeSelect id="strategy" value={strategy} onChange={(e) => onStrategy(e.target.value)} disabled={!strategies.length}>
@@ -72,6 +82,7 @@ export function Header({ status, strategies, strategy, onStrategy, onRun, runnin
             {running ? "Scanning" : "Run scan"}
           </Button>
         </form>
+        )}
       </div>
 
       {status && (

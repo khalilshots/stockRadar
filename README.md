@@ -2,6 +2,8 @@
 
 A multi-agent stock screener. Two teams of small agents work through a list of tickers: the Discovery team filters on price, float, volume and news catalysts, and the Analysis team looks for momentum, breakout and reversal setups, builds a trade plan and ranks what's left. A FastAPI backend runs the scans and a React dashboard shows the results, including why every dropped ticker was dropped.
 
+**[Live demo](https://khalilshots.github.io/stockRadar/)**, a saved scan you can click through.
+
 ![Dashboard with sample data](docs/dashboard.png)
 
 *Screenshot uses made-up tickers.*
@@ -97,6 +99,19 @@ npm run dev                                     # http://localhost:5173
 ```
 
 The dev server proxies `/api` to the backend on port 8000.
+
+### Updating the live demo
+
+The demo on GitHub Pages is the dashboard built in demo mode, reading one saved scan instead of the API.
+
+```bash
+cd backend
+python run.py
+python export_demo.py      # writes frontend/public/demo-scan.json
+git add ../frontend/public/demo-scan.json && git commit -m "update demo scan" && git push
+```
+
+Pushing anything under `frontend/` rebuilds and redeploys it through `.github/workflows/demo.yml`.
 
 ### Tests
 

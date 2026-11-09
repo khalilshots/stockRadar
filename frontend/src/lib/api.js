@@ -17,7 +17,10 @@ async function request(path, options = {}) {
   return res.json()
 }
 
-export const api = {
+export const DEMO = import.meta.env.VITE_DEMO === "1"
+export const REPO_URL = "https://github.com/khalilshots/stockRadar"
+
+const liveApi = {
   status: () => request("/api/status"),
   strategies: () => request("/api/strategies"),
   scans: () => request("/api/scans?limit=10"),
@@ -27,6 +30,44 @@ export const api = {
   startScan: (strategy, tickers) =>
     request("/api/scans", { method: "POST", body: JSON.stringify({ strategy, tickers: tickers?.length ? tickers : null }) }),
 }
+
+// the public demo has no backend, it serves one real scan exported with backend/export_demo.py
+let demoScan
+const loadDemo = () => {
+  demoScan ??= fetch(`${import.meta.env.BASE_URL}demo-scan.json`).then((res) => {
+    if (!res.ok) throw new Error("No sample scan has been published yet.")
+    return res.json()
+  })
+  return demoScan
+}
+
+const demoApi = {
+  status: async () => {
+    const s = await loadDemo()
+    return { llm_model: s.llm?.model ?? null, sources: s.sources, scheduler: { enabled: false }, scan_running: null }
+  },
+  strategies: async () => [(await loadDemo()).criteria],
+  scans: async () => [],
+  latest: loadDemo,
+  scan: loadDemo,
+  ticker: async (_id, ticker) => {
+    const s = await loadDemo()
+    const t = ticker.toUpperCase()
+    if (!s.traces[t]) throw new Error(`${t} wasn't in this scan`)
+    return {
+      ticker: t,
+      trace: s.traces[t],
+      snapshot: s.snapshots[t] ?? null,
+      candidate: s.final.find((c) => c.ticker === t) ?? null,
+      dropped: s.dropped.find((d) => d.ticker === t) ?? null,
+    }
+  },
+  startScan: async () => {
+    throw new Error("This demo shows a saved scan. Clone the repo to run live scans.")
+  },
+}
+
+export const api = DEMO ? demoApi : liveApi
 
 export const AGENT_LABELS = {
   market_data: "Price data",

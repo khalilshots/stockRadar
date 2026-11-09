@@ -5,7 +5,7 @@ import { Header } from "@/components/Header"
 import { DroppedTable, PicksTable, WatchlistTable } from "@/components/Tables"
 import { TickerDetail } from "@/components/TickerDetail"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { api } from "@/lib/api"
+import { DEMO, REPO_URL, api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const POLL_MS = 1500
@@ -96,9 +96,17 @@ export default function App() {
         apiDown={apiDown}
       />
 
+      {DEMO && scan && (
+        <p className="rounded-md border border-rule bg-sheet px-4 py-3 text-sm text-slate">
+          This is a saved scan from {when(scan.started_at)}, run on real market data. Click any ticker to see each agent's
+          call on it. Live scans need the backend and a local model, so{" "}
+          <a href={REPO_URL} className="font-medium text-ink underline underline-offset-4">clone the repo</a> to run your own.
+        </p>
+      )}
+
       {apiDown && (
         <div role="alert" className="rounded-md border border-down/40 bg-down/8 px-4 py-3 text-sm text-ink">
-          Can't reach the API. Start it from the backend folder with <code className="rounded bg-muted px-1.5 py-0.5">uvicorn main:app --reload</code>, then refresh.
+          {DEMO ? "No sample scan is published yet." : <>Can't reach the API. Start it from the backend folder with <code className="rounded bg-muted px-1.5 py-0.5">uvicorn main:app --reload</code>, then refresh.</>}
         </div>
       )}
       {error && (
