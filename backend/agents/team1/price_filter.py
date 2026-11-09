@@ -1,50 +1,42 @@
-from litellm import completion
-import json
+from typing import Callable
 
-def run_price_filter(stock_data: dict, criteria: dict) -> dict:
-    """Check a stock's price and float against the strategy criteria."""
+from agents.base import fmt_int, missing, result
+from strategies.strategy_manager import Criteria
 
-    system_prompt = """
-You are a stock filter agent. 
-Your job: decide if a stock passes the user's price and float criteria.
-You must respond ONLY with this JSON, no other text:
-{
-    "ticker": "string",
-    "passed": true or false,
-    "reason": "one sentence explaining why"
-}
-"""
+AGENT = "price_filter"
 
-    user_prompt = f"""
-Stock data:
-{json.dumps(stock_data, indent=2)}
 
-User criteria:
-- Price must be between ${criteria['price_min']} and ${criteria['price_max']}
-- Float must be below {criteria['max_float']:,} shares
+def run(snap: dict, criteria: Criteria, get_fundamentals: Callable[[str], dict]) -> dict:
+    """
+    Price, gap, prior-day run and float. Plain comparisons, no LLM needed.
+    The float lookup is a separate network call, so it only happens once the
+    cheap price checks have passed.
+    """
+    ticker = snap["ticker"]
+    price = snap.get("price")
+    if price is None:
+        return missing(ticker, AGENT, "no price")
 
-Does this stock pass?
-"""
+    if not criteria.price_min <= price <= criteria.price_max:
+        return result(ticker, AGENT, False, f"price ${price:.2f} is outside ${criteria.price_min:g}-${criteria.price_max:g}", price=price)
 
-    response = completion(
-        model="ollama/llama3.2:3b",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_prompt}
-        ],
-        temperature=0
-    )
+    gap = snap.get("gap_percent")
+    if gap is None or gap < criteria.min_gap_percent:
+        return result(ticker, AGENT, False, f"gap {gap}% is under the {criteria.min_gap_percent:g}% minimum", gap_percent=gap)
 
-    raw = response.choices[0].message.content
+    prior = snap.get("prior_day_gain")
+    if prior is not None and prior > criteria.max_prior_day_gain:
+        return result(ticker, AGENT, False, f"already ran {prior}% yesterday, over the {criteria.max_prior_day_gain:g}% cap", prior_day_gain=prior)
 
-    try:
-        result = json.loads(raw)
-    except json.JSONDecodeError:
-        # model didn't return valid json, fail the ticker
-        result = {
-            "ticker": stock_data["ticker"],
-            "passed": False,
-            "reason": f"Agent returned unparseable response: {raw}"
-        }
+    float_shares = None
+    if criteria.max_float:
+        float_shares = get_fundamentals(ticker).get("float_shares")
+        if not float_shares:
+            return missing(ticker, AGENT, "float not available")
+        if float_shares > criteria.max_float:
+            return result(ticker, AGENT, False, f"float {fmt_int(float_shares)} is over {fmt_int(criteria.max_float)}", float_shares=float_shares)
 
-    return result
+    reason = f"${price:.2f}, gapped {gap}%"
+    if float_shares:
+        reason += f", float {fmt_int(float_shares)}"
+    return result(ticker, AGENT, True, reason, price=price, gap_percent=gap, float_shares=float_shares)
