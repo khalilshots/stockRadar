@@ -41,9 +41,9 @@ def run(snap: dict, setup: dict, catalyst: dict, risk: dict, sentiment: dict | N
         "setup checks passed": ", ".join(k for k, ok in setup["data"].get("checks", {}).items() if ok),
         "change today %": snap.get("change_percent"),
         "relative volume": f"{snap.get('relative_volume')}x",
-        "RSI 14": snap.get("rsi_14"),
+        "RSI": snap.get("rsi_14"),
         "% from 20-day high": snap.get("pct_from_high_20"),
-        "red days before today": snap.get("down_streak"),
+        "red days in a row before today": snap.get("down_streak") or None,
         "news": headline,
     }.items() if v not in (None, ""))
 

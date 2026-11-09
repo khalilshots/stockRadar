@@ -6,7 +6,7 @@ A multi-agent stock screener. Two teams of small agents work through a list of t
 
 ![Dashboard with sample data](docs/dashboard.png)
 
-*Screenshot uses made-up tickers.*
+*From a real Oversold Bounce scan on November 9, 2026, graded by Llama 3.2 3B running locally.*
 
 ## How a scan works
 
