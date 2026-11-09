@@ -1,5 +1,12 @@
 fastapi
 uvicorn
 yfinance
+pandas
+numpy
+requests
 litellm
+pydantic
 pydantic-settings
+apscheduler
+pytest
+httpx

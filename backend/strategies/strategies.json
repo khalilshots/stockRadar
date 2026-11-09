@@ -1,18 +1,38 @@
 {
-    "strategies": [
-        {
-            "id": "1",
-            "name": "Small Cap Momentum",
-            "criteria": {
-                "price_min": 2,
-                "price_max": 20,
-                "max_float": 10000000,
-                "min_volume": 50000,
-                "min_gap_percent": 10,
-                "max_prior_day_gain": 40
-            },
-            "setup_preferences": ["momentum", "breakout"],
-            "risk_per_trade": 500
-        }
-    ]
+  "strategies": [
+    {
+      "id": "1",
+      "name": "Small Cap Momentum",
+      "criteria": {
+        "price_min": 2,
+        "price_max": 20,
+        "max_float": 10000000,
+        "min_volume": 50000,
+        "min_relative_volume": 1.5,
+        "min_gap_percent": 10,
+        "max_prior_day_gain": 40,
+        "require_catalyst": true
+      },
+      "setup_preferences": ["momentum", "breakout"],
+      "risk_per_trade": 500,
+      "universe": ["small_cap_gainers", "day_gainers", "most_actives"]
+    },
+    {
+      "id": "2",
+      "name": "Oversold Bounce",
+      "criteria": {
+        "price_min": 5,
+        "price_max": 100,
+        "max_float": 500000000,
+        "min_volume": 500000,
+        "min_relative_volume": 1.0,
+        "min_gap_percent": -100,
+        "max_prior_day_gain": 15,
+        "require_catalyst": false
+      },
+      "setup_preferences": ["reversal"],
+      "risk_per_trade": 300,
+      "universe": ["day_losers", "most_actives"]
+    }
+  ]
 }

@@ -1,5 +1,0 @@
-fastapi
-uvicorn
-yfinance
-litellm
-pydantic-settings
