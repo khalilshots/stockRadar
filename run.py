@@ -3,7 +3,6 @@ from agents.team1.price_filter import run_price_filter
 import logging
 from utils.gates import check_gate
 from strategies.strategy_manager import get_strategy
-# This line makes logging messages actually show up in your terminal
 logging.basicConfig(level=logging.WARNING)
 
 strategy = get_strategy("Small Cap Momentum")

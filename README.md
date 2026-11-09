@@ -4,7 +4,7 @@ A stock scanner built around small LLM agents. Each agent answers one narrow que
 
 The goal is to go from a broad universe of tickers to a short, ranked list of setups worth watching, using the criteria of a strategy you define.
 
-> **Status:** early. The first agent (price filter) works end to end. Most other agents, data tools and the scheduler are stubbed out, and the frontend is still the Vite starter.
+> Status: early. The first agent (price filter) works end to end. Most other agents, data tools and the scheduler are stubbed out, and the frontend is still the Vite starter.
 
 ## How it's meant to work
 
@@ -14,12 +14,12 @@ universe (≤500)  ──►  Team 1: screening  ──►  watchlist (≤50)  �
                       catalyst                                      reversal · risk · scoring
 ```
 
-- **Strategies** live in `strategies.json`. Each one sets price range, max float, min volume, min gap %, max prior-day gain, preferred setups and risk per trade.
-- **Agents** get the stock data plus the strategy criteria and reply with `{ticker, passed, reason}`.
-- **Gates** (`utils/gates.py`) run after every agent and drop a ticker on a fail, an error, or missing data.
-- **LLM calls** go through LiteLLM, defaulting to a local Llama 3.2 on Ollama at temperature 0. Swapping to a hosted model is a one-line change.
-- **Scans** are planned for three windows (Eastern): night (10 PM to midnight), premarket (9:00 to 9:20 AM) and post-market (4 to 6 PM).
-- **Journal:** results and outcomes get logged to Notion.
+- Strategies live in `strategies.json`. Each one sets price range, max float, min volume, min gap %, max prior-day gain, preferred setups and risk per trade.
+- Agents get the stock data plus the strategy criteria and reply with `{ticker, passed, reason}`.
+- Gates (`utils/gates.py`) run after every agent and drop a ticker on a fail, an error, or missing data.
+- LLM calls go through LiteLLM, defaulting to a local Llama 3.2 on Ollama at temperature 0. Swapping to a hosted model is a one-line change.
+- Scans are planned for three windows (Eastern): night (10 PM to midnight), premarket (9:00 to 9:20 AM) and post-market (4 to 6 PM).
+- Results and outcomes get logged to Notion.
 
 ## What's built
 

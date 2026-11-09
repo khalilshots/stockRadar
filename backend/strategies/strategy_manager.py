@@ -1,5 +1,3 @@
-# strategies/strategy_manager.py
-
 import json
 from pathlib import Path
 
@@ -7,10 +5,7 @@ STRATEGIES_FILE = Path(__file__).parent / "strategies.json"
 
 
 def load_all() -> list:
-    """
-    Read strategies.json and return the list of strategies.
-    Returns empty list if file doesn't exist yet.
-    """
+    """Return all strategies, or [] if the file doesn't exist."""
     if not STRATEGIES_FILE.exists():
         return []
 
@@ -21,10 +16,7 @@ def load_all() -> list:
 
 
 def get_strategy(name: str) -> dict | None:
-    """
-    Find a strategy by name.
-    Returns None if not found.
-    """
+    """Return the strategy with this name, or None."""
     strategies = load_all()
 
     for strategy in strategies:
@@ -36,10 +28,7 @@ def get_strategy(name: str) -> dict | None:
 
 
 def save_strategy(strategy: dict) -> None:
-    """
-    Add a new strategy to strategies.json.
-    If a strategy with the same name exists, overwrite it.
-    """
+    """Add a strategy, overwriting any existing one with the same name."""
     strategies = load_all()
 
     for i, existing in enumerate(strategies):

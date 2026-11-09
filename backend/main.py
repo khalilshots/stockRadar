@@ -1,13 +1,9 @@
-# backend/main.py
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Create the FastAPI app
 app = FastAPI(title="Stock Radar API")
 
-# Allow React (running on port 5173) to talk to FastAPI (running on 8000)
-# Without this the browser will block all requests — this is called CORS
+# let the vite dev server call the api
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -21,9 +17,5 @@ def root():
 
 @app.get("/health")
 def health_check():
-    """
-    Health check endpoint.
-    Returns 200 OK if the API is running.
-    """
     return {"status": "ok"}
 

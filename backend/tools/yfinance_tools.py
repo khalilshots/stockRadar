@@ -1,13 +1,7 @@
-# tools/yfinance_tools.py
-
 import yfinance as yf
 
 def get_stock_info(ticker: str) -> dict | None:
-    """
-    Fetch basic info for a stock.
-    Returns a clean dict with just what we need.
-    Returns None if anything goes wrong.
-    """
+    """Basic price/float/volume info for a ticker, or None on error."""
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
